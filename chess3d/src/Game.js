@@ -177,6 +177,8 @@ export class Game {
    */
   isLegal(piece, toCol, toRow) {
     if (toCol < 0 || toCol > 7 || toRow < 0 || toRow > 7) return false;
+    // Moverse a la misma casilla nunca es legal (evita self-move y cambio de turno espurio)
+    if (toCol === piece.col && toRow === piece.row) return false;
 
     const target = this.board[toCol][toRow];
     if (target && target.color === piece.color) return false; // captura propia = ilegal

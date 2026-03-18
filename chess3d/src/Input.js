@@ -12,6 +12,8 @@ import { b2w, w2b, COLOR } from './Game.js';
 import { Animations } from './Animations.js';
 
 export class InputHandler {
+  /** Altura (Y) a la que vuela la pieza durante el arrastre */
+  static HOVER_Y = 0.55;
   /**
    * @param {import('./Game.js').Game}    game
    * @param {THREE.Scene}                scene
@@ -109,7 +111,15 @@ export class InputHandler {
 
     document.body.style.cursor = 'grabbing';
 
-    // Prevenir scroll en touch
+    // Posicionar pieza INMEDIATAMENTE bajo el cursor a altura de hover
+    // (evita que la pieza "se quede colgada" en su posición original)
+    this._raycaster.setFromCamera(ndc, this.camera);
+    this._raycaster.ray.intersectPlane(this._dragPlane, this._hitPoint);
+    piece.mesh.position.set(this._hitPoint.x, InputHandler.HOVER_Y, this._hitPoint.z);
+
+    // Cancelar cualquier animación pendiente sobre esta pieza
+    this.animations._tweens = this.animations._tweens.filter(t => t.mesh !== piece.mesh);
+
     if (e.preventDefault) e.preventDefault();
   }
 
@@ -117,12 +127,11 @@ export class InputHandler {
     const ndc = this._ndc(e);
 
     if (this._dragging && this._selectedPiece) {
-      // Actualizar posición durante arrastre
       this._raycaster.setFromCamera(ndc, this.camera);
       this._raycaster.ray.intersectPlane(this._dragPlane, this._hitPoint);
       this._selectedPiece.mesh.position.set(
         this._hitPoint.x,
-        0.9,                  // altura visual durante el arrastre
+        InputHandler.HOVER_Y,
         this._hitPoint.z
       );
 
@@ -155,25 +164,24 @@ export class InputHandler {
     if (target && this.game.isLegal(piece, target.col, target.row)) {
       // ── Movimiento legal ──────────────────────────────────────────────────
       const targetWorld = b2w(target.col, target.row);
-
-      // Ejecutar en el estado del juego (actualiza board[][] y hasMoved)
       const move = this.game.executeMove(piece, target.col, target.row);
 
-      // Animar pieza principal
-      this.animations.movePiece(piece.mesh, targetWorld, 0.32, false, () => {
+      // fromDrag=true → caída suave sin arco desde la altura de arrastre
+      this.animations.movePiece(piece.mesh, targetWorld, 0.28, false, true, () => {
         if (this.onMoveCompleted) this.onMoveCompleted(move);
       });
 
-      // Animar torre en enroque
       if (move.rookMove) {
-        this.animations.movePiece(move.rookMove.rook.mesh, move.rookMove.target, 0.32, false);
+        // La torre no viene de drag → deslizamiento con arco
+        this.animations.movePiece(move.rookMove.rook.mesh, move.rookMove.target, 0.32, false, false);
       }
 
       this._playSound(move.captured ? 'capture' : 'move');
       this._showStatus(`${piece.color === COLOR.W ? '♔ Blancas' : '♚ Negras'}: ${move.notation}`);
     } else {
-      // ── Movimiento ilegal → animar rebote ─────────────────────────────────
-      this.animations.shake(piece.mesh);
+      // ── Movimiento ilegal → volver al origen con sacudida ─────────────────
+      // Animar caída de vuelta a posición original
+      this.animations.movePiece(piece.mesh, this._originPos, 0.28, false, true);
       this._showStatus('⚠ Movimiento ilegal');
     }
   }
@@ -190,12 +198,12 @@ export class InputHandler {
     const move = this.game.executeMove(piece, toCol, toRow);
     const targetWorld = b2w(toCol, toRow);
 
-    this.animations.movePiece(piece.mesh, targetWorld, 0.40, false, () => {
+    this.animations.movePiece(piece.mesh, targetWorld, 0.40, false, false, () => {
       if (this.onMoveCompleted) this.onMoveCompleted(move);
     });
 
     if (move.rookMove) {
-      this.animations.movePiece(move.rookMove.rook.mesh, move.rookMove.target, 0.40, false);
+      this.animations.movePiece(move.rookMove.rook.mesh, move.rookMove.target, 0.40, false, false);
     }
 
     this._playSound(move.captured ? 'capture' : 'move');

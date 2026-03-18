@@ -181,19 +181,42 @@ export class Piece {
   deselect() { this._applyMat(this.mesh, false); }
 
   /**
-   * Reconstruye la geometría del mesh (usado en promoción de peón).
-   * Mantiene la posición actual del grupo.
+   * Reconstruye la geometría del mesh con primitivas (promoción de peón).
+   * Mantiene la posición y rotación actuales del grupo.
    */
   rebuildMesh() {
     const pos = this.mesh.position.clone();
     const rot = this.mesh.rotation.clone();
-    // Vaciar hijos actuales
     while (this.mesh.children.length) this.mesh.remove(this.mesh.children[0]);
-    // Añadir nueva geometría al grupo existente
     const fresh = BUILDERS[this.type]();
     fresh.children.forEach(c => this.mesh.add(c));
     this._applyMat(this.mesh, false);
     this.mesh.position.copy(pos);
     this.mesh.rotation.copy(rot);
+  }
+
+  /**
+   * Vuelve al estilo de primitivas Three.js (sin tocar posición/rotación).
+   * Usado por PieceStyleManager al cambiar al pack 'primitives'.
+   */
+  resetToPrimitives() {
+    while (this.mesh.children.length) this.mesh.remove(this.mesh.children[0]);
+    const fresh = BUILDERS[this.type]();
+    fresh.children.forEach(c => this.mesh.add(c));
+    this._applyMat(this.mesh, false);
+  }
+
+  /**
+   * Reemplaza la geometría del grupo con un mesh STL ya normalizado.
+   * La geometría debe tener: base en Y=0, centrado en X/Z, escala correcta.
+   * @param {THREE.BufferGeometry} geo — geometría normalizada (clone del cache)
+   */
+  setSTLGeometry(geo) {
+    while (this.mesh.children.length) this.mesh.remove(this.mesh.children[0]);
+    const mat  = MAT[this.color];
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.castShadow    = true;
+    mesh.receiveShadow = false;
+    this.mesh.add(mesh);
   }
 }

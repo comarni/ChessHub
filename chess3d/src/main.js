@@ -8,6 +8,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Game, COLOR } from './Game.js';
 import { InputHandler } from './Input.js';
 import { Openings } from './Openings.js';
+import { PieceStyleManager } from './PieceStyleManager.js';
 
 // ── Renderer ──────────────────────────────────────────────────────────────────
 
@@ -76,9 +77,23 @@ scene.add(accent);
 
 // ── Sistemas del juego ────────────────────────────────────────────────────────
 
-const game     = new Game(scene);
-const input    = new InputHandler(game, scene, camera, renderer, controls);
-const openings = new Openings(game, input);
+const game         = new Game(scene);
+const input        = new InputHandler(game, scene, camera, renderer, controls);
+const openings     = new Openings(game, input);
+const styleManager = new PieceStyleManager(game);
+
+// Panel de estilos de piezas
+const styleContainer = document.getElementById('style-container');
+if (styleContainer) styleManager.buildPreviewUI(styleContainer);
+
+// Re-aplicar estilo activo tras resetear el tablero (openings lo llama)
+const _origReset = game.reset.bind(game);
+game.reset = () => {
+  _origReset();
+  if (styleManager.currentStyle !== 'primitives') {
+    styleManager.applyStyle(styleManager.currentStyle);
+  }
+};
 
 // Iniciar HUD de aperturas (asíncrono, carga el JSON)
 openings.populateUI();
@@ -109,7 +124,7 @@ document.getElementById('loading').style.display = 'none';
 animate();
 
 // Exponer para depuración en consola
-window.chessHub = { game, input, openings, scene, camera };
+window.chessHub = { game, input, openings, styleManager, scene, camera };
 
 // ── Actualización del HUD ─────────────────────────────────────────────────────
 
