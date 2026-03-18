@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChessHub 3D — MVP</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0f0f1a;
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      color: #ddd;
+    }
+
+    #canvas {
+      display: block;
+      position: fixed;
+      top: 0; left: 0;
+    }
+
+    /* ── HUD lateral ───────────────────────────────────── */
+    #hud {
+      position: fixed;
+      top: 0; right: 0;
+      width: 230px;
+      height: 100vh;
+      background: rgba(8, 8, 20, 0.88);
+      border-left: 1px solid #2a2a4a;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 14px 12px;
+      overflow-y: auto;
+      z-index: 10;
+    }
+
+    #hud h1 {
+      font-size: 17px;
+      color: #f0c060;
+      letter-spacing: 1px;
+      text-align: center;
+    }
+
+    #turn-indicator {
+      padding: 7px 10px;
+      border-radius: 6px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 13px;
+      background: rgba(240,217,181,0.15);
+      border: 1px solid rgba(240,217,181,0.25);
+      transition: background 0.4s, border-color 0.4s;
+    }
+    #turn-indicator.black {
+      background: rgba(44,24,16,0.5);
+      border-color: rgba(180,100,40,0.3);
+    }
+
+    .section-title {
+      font-size: 11px;
+      color: #7090cc;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 2px;
+    }
+
+    select, button {
+      width: 100%;
+      padding: 6px 8px;
+      background: #1a1a38;
+      color: #ccc;
+      border: 1px solid #333360;
+      border-radius: 5px;
+      font-size: 12px;
+      cursor: pointer;
+      margin-bottom: 4px;
+    }
+    button:hover { background: #252550; color: #fff; }
+    button:active { transform: scale(0.98); }
+
+    #btn-play-all { color: #80d080; }
+    #btn-reset    { color: #d08080; }
+
+    #move-list {
+      flex: 1;
+      font-size: 11px;
+      line-height: 1.6;
+      overflow-y: auto;
+      border: 1px solid #222244;
+      border-radius: 4px;
+      padding: 6px;
+      min-height: 80px;
+      max-height: 180px;
+      background: rgba(0,0,0,0.3);
+    }
+    .move-row { display: flex; gap: 4px; }
+    .move-num { color: #558; min-width: 22px; }
+    .move-w   { color: #e8d9b0; min-width: 48px; }
+    .move-b   { color: #b08060; }
+
+    #status-msg {
+      padding: 7px 8px;
+      border-radius: 5px;
+      font-size: 11px;
+      text-align: center;
+      background: #0a1a0a;
+      border: 1px solid #1a3a1a;
+      color: #70d070;
+      min-height: 30px;
+    }
+
+    #drag-hint {
+      font-size: 10px;
+      color: #555;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    /* ── Loading overlay ───────────────────────────────── */
+    #loading {
+      position: fixed;
+      inset: 0;
+      background: #0f0f1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+      z-index: 100;
+      color: #f0c060;
+      font-size: 18px;
+    }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid #333;
+      border-top-color: #f0c060;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Panel de estilos de piezas ─────────────────── */
+    #style-container {
+      border: 1px solid #2a2a4a;
+      border-radius: 6px;
+      padding: 8px;
+      background: rgba(0,0,8,0.4);
+    }
+
+    .style-tabs {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 7px;
+    }
+    .style-tab {
+      flex: 1;
+      padding: 5px 4px;
+      font-size: 10px;
+      background: #141430;
+      border: 1px solid #2a2a50;
+      border-radius: 4px;
+      color: #889;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      margin-bottom: 0;
+    }
+    .style-tab:hover  { background: #1e1e48; color: #bbc; }
+    .style-tab.active {
+      background: #1e1e50;
+      border-color: #f0c060;
+      color: #f0c060;
+      font-weight: 600;
+    }
+
+    .pack-label {
+      font-size: 10px;
+      color: #7090cc;
+      text-align: center;
+      margin-bottom: 5px;
+      letter-spacing: 0.5px;
+    }
+
+    .piece-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      transition: opacity 0.2s;
+    }
+    .piece-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #0d0d22;
+      border: 1px solid #1e1e3a;
+      border-radius: 4px;
+      padding: 3px 2px;
+      cursor: default;
+      transition: border-color 0.15s;
+    }
+    .piece-cell:hover { border-color: #4466aa; }
+
+    .piece-thumb {
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: contain;
+      padding: 2px;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8));
+    }
+    .piece-sym {
+      font-size: 22px;
+      line-height: 1;
+      padding: 4px 0;
+      color: #c8b090;
+    }
+    .piece-name {
+      font-size: 8px;
+      color: #556;
+      margin-top: 1px;
+      text-align: center;
+    }
+
+    .style-loading {
+      font-size: 10px;
+      color: #f0c060;
+      text-align: center;
+      padding: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    Cargando ChessHub 3D…
+  </div>
+
+  <canvas id="canvas"></canvas>
+
+  <div id="hud">
+    <h1>♟ ChessHub 3D</h1>
+
+    <div id="turn-indicator">Turno: BLANCAS ♔</div>
+
+    <div>
+      <div class="section-title">Aperturas</div>
+      <select id="opening-select"><option value="">— Selecciona apertura —</option></select>
+      <select id="variant-select"><option value="">— Variante —</option></select>
+      <button id="btn-next-move">▶ Siguiente movimiento</button>
+      <button id="btn-play-all">⏩ Reproducir apertura</button>
+      <button id="btn-reset">↺ Reiniciar partida</button>
+    </div>
+
+    <div>
+      <div class="section-title">Estilo de piezas</div>
+      <div id="style-container"><!-- PieceStyleManager.buildPreviewUI() lo rellena --></div>
+    </div>
+
+    <div>
+      <div class="section-title">Historial</div>
+      <div id="move-list"></div>
+    </div>
+
+    <div id="status-msg">Arrastra una pieza para empezar</div>
+
+    <div id="drag-hint">
+      🖱 Click + arrastra las piezas<br>
+      Rueda: zoom · Click derecho: rotar cámara<br>
+      Las casillas verdes = movimientos legales
+    </div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
